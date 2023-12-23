@@ -1,0 +1,9 @@
+{
+    "C_Cpp.errorSquiggles": "disabled",
+    "files.associations": {
+        "stdio.h": "c",
+        "fcntl.h": "c",
+        "list.h": "c",
+        "lcd.h": "c"
+    }
+}
