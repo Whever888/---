@@ -4,48 +4,21 @@
 #include<time.h>
 #include"jpg.h"
 #include"list.h"
-// #include<sys/ioctl.h>
-
-// typedef struct xy
-// {
-// 	int x;
-// 	int y;
-// }xy, *P_xy;
+#include<linux/input.h>
 
 
+//显示菜单
 void manu(void)
 {
-	lcd_open();
-	
 	/* 在x=0,y=0,显示图片 */
 	lcd_draw_jpg(0,0,"gd.jpg");
 	lcd_draw_jpg(400,0,"photo.jpg");
 	lcd_draw_jpg(0,240,"game.jpg");
 	lcd_draw_jpg(400,240,"text.jpg");
 	lcd_draw_jpg(750,0,"back.jpg");
-	
-	/* 关闭LCD设备 */
-	// lcd_close();
 }
 
-// P_xy ts_get_xy(int fd_ts, input_event tsEvent)
-// {
-// 	P_xy xy_tmp = {0};
-// 	int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
-// 	if (tsEvent.type == EV_ABS)
-// 	{
-// 		if (tsEvent.code == ABS_X)
-// 		{
-// 			xy_tmp->x = tsEvent.value * 800 / 1024;
-// 		}
-// 		else if(tsEvent.code == ABS_Y)
-// 		{
-// 			xy_tmp->y = tsEvent.value *480 / 600;
-// 		}
-// 	}
-// 	return xy_tmp;
-// }
-	
+//解码刮刮乐中奖的jpg图片
 int jm_ggl_jpg(char *jpg_path, int ggl_color_buf_1[800*480])
 {
 	//******************************解码刮刮乐中奖的jpg图片**************************
@@ -157,7 +130,8 @@ int jm_ggl_jpg(char *jpg_path, int ggl_color_buf_1[800*480])
 	//*******************刮刮乐中奖图片解码完成******************************
 
 }
-	
+
+
 int main(int argc, char const *argv[])
 {
 	char *xiaosuo[40] = 
@@ -197,17 +171,18 @@ int main(int argc, char const *argv[])
 	"拉出来。”年纪最小的那少年不服气了：“我不依，你们",
 	"偏心，我告诉我娘去！”老烟头大笑：“你看你看，三伢"
 	};
-	int  gd_tmp = 0, ggl_color_buf[800*480];
-	int txt_position = 0;
-	char gd_buf[20] = {0};
-	FILE *gd_count = fopen("gd_count.txt", "r+");
+	int  gd_tmp = 0;//功德计数
+	int ggl_color_buf[800*480];//图片刮刮乐解码后的像素信息
+	int txt_position = 0;//小说位置
+	char gd_buf[20] = {0};//功德转换字符数组
+	FILE *gd_count = fopen("gd_count.txt", "r+");//功德文件
 	if (gd_count == NULL)
 	{
 		printf("打开“gd_count”失败\n");
 	}
 
 	//********************************************初始化相册*************************************************
-	FILE *file1 = fopen("dir.txt", "w+");
+	// FILE *file1 = fopen("dir.txt", "w+");
 	P_Node Head = NodeInit(NULL);
 	if (argc != 2)
 	{
@@ -215,38 +190,11 @@ int main(int argc, char const *argv[])
 		return -1;
 	}
 	dt_dir(argv[1], ".jpg", Head);
-	fclose(file1);
-
-	manu();//显示菜单
-//************************************************功德初始计数*****************************************************
-	
-	//初始化Lcd
-	struct LcdDevice* lcd = init_lcd("/dev/fb0");
-			
-	//打开字体	
-	font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-	  
-	//字体大小的设置
-	fontSetSize(f,50);
-	
-	//创建一个画板（点阵图）
-	bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
-
-	fscanf(gd_count, "%s", &gd_buf);
-	
-	//将字体写到点阵图上
-	fontPrint(f,bm,0,0,gd_buf,getColor(0,0,0,0),100);
-	
-	//把字体框输出到LCD屏幕上
-	show_font_to_lcd(lcd->mp,0,0,bm);
-	
-	//关闭字体，关闭画板
-	fontUnload(f);
-	destroyBitmap(bm);
+	// fclose(file1);
 //********************************************触摸屏初始化********************************************
 	
 
-	int fd_ts = open("/dev/input/event0", O_RDWR);
+	int fd_ts = open("/dev/input/event0", O_RDONLY);
 	if (fd_ts == -1)
 	{
 		perror("open event 0 error");
@@ -254,20 +202,50 @@ int main(int argc, char const *argv[])
 	}
 
 	struct input_event tsEvent = {0};
+
 	int x_start = 0;
 	int y_start = 0;
+
+	int x_end = 0;
+	int y_end = 0;
 
 	int x_tmp = 0;
 	int y_tmp = 0;
 
-	int x_end = 0;
-	int y_end = 0;
-//***************************************主循环**************************************************
+	
+
 	//********************显示屏初始化**************************
 	lcd_open();
-	while (1)
-	{
+//****************************************************菜单********************************************************
 
+		manu();//显示菜单
+		fscanf(gd_count, "%s", &gd_buf);
+
+		//初始化Lcd
+		struct LcdDevice* lcd = init_lcd("/dev/fb0");
+				
+		//打开字体	
+		font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
+		
+		//字体大小的设置
+		fontSetSize(f,50);
+		
+		//创建一个画板（点阵图）
+		bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,0,0,0)); //也可使用createBitmapWithInit函数，改变画板颜色
+		
+		//将字体写到点阵图上
+		fontPrint(f,bm,0,0,gd_buf,getColor(0,255,255,255),100);
+		
+		//把字体框输出到LCD屏幕上
+		show_font_to_lcd(lcd->mp,0,0,bm);
+		
+		//关闭画板
+		destroyBitmap(bm);
+	
+
+	
+	while (1)//***************************************主循环**************************************************
+	{
 		int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
 		if (tsEvent.type == EV_ABS)
 		{
@@ -281,15 +259,35 @@ int main(int argc, char const *argv[])
 			}
 		}
 
+//****************************************返回*****************************************
+		if (tsEvent.type == EV_KEY &&
+			tsEvent.code == BTN_TOUCH &&
+			tsEvent.value == 1 && x_tmp >750 && y_tmp < 50)
+		{
+			manu();
+			//初始化Lcd
+			struct LcdDevice* lcd = init_lcd("/dev/fb0");
+							
+
+			//创建一个画板（点阵图）
+			bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,0,0,0)); //也可使用createBitmapWithInit函数，改变画板颜色
+			
+			//将字体写到点阵图上
+			fontPrint(f,bm,0,0,gd_buf,getColor(0,255,255,255),100);//******把功德显示在屏幕左上角
+			
+			//把字体框输出到LCD屏幕上
+			show_font_to_lcd(lcd->mp,0,0,bm);
+			
+			//关闭画板
+			destroyBitmap(bm);
+		}
 //*****************************************************功德1**********************************************************
 		if (tsEvent.type == EV_KEY &&
 			tsEvent.code == BTN_TOUCH &&
 			tsEvent.value == 0 && x_tmp <400 && y_tmp < 240)
 		{
-			x_end = x_tmp;
-			y_end = y_tmp;
+
 			lcd_draw_jpg(0,0,"gd2.jpg");
-			lcd_draw_jpg(750,0,"back.jpg");
 
 			fseek(gd_count, 0, SEEK_SET);
 			fscanf(gd_count, "%s", &gd_buf);
@@ -303,14 +301,7 @@ int main(int argc, char const *argv[])
 
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
-					
-			//打开字体	
-			font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-			
-			//字体大小的设置
-			fontSetSize(f,50);
-			
-			
+						
 			//创建一个画板（点阵图）
 			bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,0,0,0)); //也可使用createBitmapWithInit函数，改变画板颜色
 			
@@ -320,8 +311,7 @@ int main(int argc, char const *argv[])
 			//把字体框输出到LCD屏幕上
 			show_font_to_lcd(lcd->mp,0,0,bm);
 			
-			//关闭字体，关闭画板
-			fontUnload(f);
+			//关闭画板
 			destroyBitmap(bm);
 		}
 //********************************************功德2*******************************************
@@ -329,23 +319,14 @@ int main(int argc, char const *argv[])
 			tsEvent.code == BTN_TOUCH &&
 			tsEvent.value == 1 && x_tmp <400 && y_tmp < 240)
 		{
-			x_start = x_tmp;
-			y_start = y_tmp;
+
 			lcd_draw_jpg(0,0,"gd1.jpg");
-			lcd_draw_jpg(750,0,"back.jpg");
 
 			fseek(gd_count, 0, SEEK_SET);
 			fscanf(gd_count, "%s", &gd_buf);
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
-					
-			//打开字体	
-			font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-			
-			//字体大小的设置
-			fontSetSize(f,50);
-			
-			
+								
 			//创建一个画板（点阵图）
 			bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,0,0,0)); //也可使用createBitmapWithInit函数，改变画板颜色
 			
@@ -355,59 +336,27 @@ int main(int argc, char const *argv[])
 			//把字体框输出到LCD屏幕上
 			show_font_to_lcd(lcd->mp,0,0,bm);
 			
-			//关闭字体，关闭画板
-			fontUnload(f);
-			destroyBitmap(bm);
-		}
-//****************************************返回*****************************************
-		if (tsEvent.type == EV_KEY &&
-			tsEvent.code == BTN_TOUCH &&
-			tsEvent.value == 1 && x_tmp >750 && y_tmp < 50)
-		{
-			x_start = x_tmp;
-			y_start = y_tmp;
-			manu();
-			//初始化Lcd
-			struct LcdDevice* lcd = init_lcd("/dev/fb0");
-					
-			//打开字体	
-			font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-			
-			//字体大小的设置
-			fontSetSize(f,50);
-			
-			
-			//创建一个画板（点阵图）
-			bitmap *bm = createBitmapWithInit(100,100,4,getColor(0,0,0,0)); //也可使用createBitmapWithInit函数，改变画板颜色
-			//bitmap *bm = createBitmap(288, 100, 4);
-			
-			// char buf[] = gd_buf;
-			
-			//将字体写到点阵图上
-			fontPrint(f,bm,0,0,gd_buf,getColor(0,255,255,255),100);
-			
-			//把字体框输出到LCD屏幕上
-			show_font_to_lcd(lcd->mp,0,0,bm);
-			
-			//关闭字体，关闭画板
-			fontUnload(f);
+			//关闭画板
 			destroyBitmap(bm);
 		}
 
+
 //*********************************相册*************************************
+		
+
 		if (tsEvent.type == EV_KEY &&
 			tsEvent.code == BTN_TOUCH &&
 			tsEvent.value == 1 && x_tmp >400 && y_tmp <240 && x_tmp <750 && y_tmp >50)
 		{
-			lcd_open();
-			
 
-			P_Node jpg_now = list_entry(&Head->ptr.next->next, Node, ptr);
+			P_Node jpg_now = list_entry(Head->ptr.next, Node, ptr);
 			printf("现在显示的是%s\n", jpg_now->Data.name);
 			lcd_draw_jpg(0,0,jpg_now->Data.name);
-			
+	
+
 			while (1)
 			{
+
 				int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
 				if (tsEvent.type == EV_ABS)
 				{
@@ -421,54 +370,57 @@ int main(int argc, char const *argv[])
 					}
 				}
 
+				
 				if (tsEvent.type == EV_KEY &&
-					tsEvent.code == BTN_TOUCH)
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 1 && x_start*y_start == 0)
 				{
-
-					if (tsEvent.value == 1 )
-					{
-						x_start = x_tmp;
-						y_start = y_tmp;
-					}
-
-					if (tsEvent.value == 0 )
-					{
-						x_end = x_tmp;
-						y_end = y_tmp;
-
-						if (x_start - x_end > 200 && abs(y_start - y_end) < 60)//*************左滑****************
-						{
-							struct list_head *tmp = NULL;
-							tmp = jpg_now->ptr.next;
-							if (tmp == NULL)
-							{
-								tmp = tmp->next;
-							}	
-							jpg_now = list_entry(tmp, Node, ptr);
-
-							printf("现在显示的是%s\n", jpg_now->Data.name);
-							lcd_draw_jpg(0,0,jpg_now->Data.name);
-						}
-
-
-
-						if (x_start - x_end < -200 && abs(y_start - y_end) < 60)//*************右滑****************
-						{
-							struct list_head *tmp = NULL;
-							tmp = jpg_now->ptr.prev;
-							if (tmp == NULL)
-							{
-								tmp = tmp->prev;
-							}	
-
-							jpg_now = list_entry(tmp, Node, ptr);
-							printf("现在显示的是%s\n", jpg_now->Data.name);
-							lcd_draw_jpg(0,0,jpg_now->Data.name);
-						}
-					}
-
+					x_start = x_tmp;
+					y_start = y_tmp;
 				}
 
+				if (tsEvent.type == EV_KEY &&
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 0 )
+				{
+					x_end = x_tmp;
+					y_end = y_tmp;
+				}
+
+				if (x_start - x_end > 200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//****左滑****
+				{
+					x_start = 0;
+					y_start = 0;
+					x_end = 0;
+					y_end = 0;
+					struct list_head *tmp = NULL;
+					tmp = jpg_now->ptr.next;
+					if(tmp == &Head->ptr)
+					{
+						tmp = tmp->next;
+					}	
+					jpg_now = list_entry(tmp, Node, ptr);
+
+					printf("现在显示的是%s\n", jpg_now->Data.name);
+					lcd_draw_jpg(0,0,jpg_now->Data.name);
+				}
+
+
+				if (x_start - x_end < -200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//****右滑***
+				{
+					x_start = 0;
+					y_start = 0;
+					x_end = 0;
+					y_end = 0;
+					struct list_head *tmp = NULL;
+					tmp = jpg_now->ptr.prev;
+					if (tmp == &Head->ptr)
+					{
+						tmp = tmp->prev;
+					}	
+
+					jpg_now = list_entry(tmp, Node, ptr);
+					printf("现在显示的是%s\n", jpg_now->Data.name);
+					lcd_draw_jpg(0,0,jpg_now->Data.name);
+				}
 				
 				//**********************************按到退出键退出***************************************
 				if (tsEvent.type == EV_KEY &&
@@ -481,7 +433,7 @@ int main(int argc, char const *argv[])
 
 			}
 			
-			lcd_close();
+			// lcd_close();
  
 		}
 //*************************************小说***************************************************
@@ -499,10 +451,7 @@ int main(int argc, char const *argv[])
 
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
-					
-			//打开字体	
-			font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-			
+							
 			//创建一个画板（点阵图）
 			bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
 			
@@ -543,68 +492,74 @@ int main(int argc, char const *argv[])
 					}
 				}
 
+				
 				if (tsEvent.type == EV_KEY &&
-					tsEvent.code == BTN_TOUCH)
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 1 && x_start*y_start == 0)
+				{
+					x_start = x_tmp;
+					y_start = y_tmp;
+				}
+
+				if (tsEvent.type == EV_KEY &&
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 0 )
+				{
+					x_end = x_tmp;
+					y_end = y_tmp;
+				}
+
+				if (x_start - x_end > 200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//*************左滑****************
+				{
+					x_start = 0;
+					y_start = 0;
+					x_end = 0;
+					y_end = 0;
+					//创建一个画板（点阵图）
+					bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
+					int j = 0, i = txt_position;
+					for (; i < txt_position+11; i++)
 					{
-
-
-						if (tsEvent.value == 1 )
-						{
-							x_start = x_tmp;
-							y_start = y_tmp;
-						}
-
-						if (tsEvent.value == 0 )
-						{
-							x_end = x_tmp;
-							y_end = y_tmp;
-
-							if (x_start - x_end > 200 && abs(y_start - y_end) < 60)//*************左滑****************
-							{
-								//创建一个画板（点阵图）
-								bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
-								int j = 0, i = txt_position;
-								for (; i < txt_position+11; i++)
-								{
-									int k = 0;
-									fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
-									j++;
-								}
-								txt_position += 11;
-								if (txt_position > 23)
-								{
-									txt_position = 0;
-								}
-								
-								show_font_to_lcd(lcd->mp,0,0,bm);//************************************把画板显示到lcd屏幕上
-								destroyBitmap(bm);//***********************销毁画板**********************
-							}
+						int k = 0;
+						fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
+						j++;
+					}
+					txt_position += 11;
+					if (txt_position > 23)
+					{
+						txt_position = 0;
+					}
+					
+					show_font_to_lcd(lcd->mp,0,0,bm);//**************把画板显示到lcd屏幕上
+					destroyBitmap(bm);//***********************销毁画板**********************
+				}
 							
 
-							if (x_start - x_end < -200 && abs(y_start - y_end) < 60)//*************右滑****************
-							{
-								//创建一个画板（点阵图）
-								bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
-								int j = 0, i = txt_position;
-								for (; i < txt_position+11; i++)
-								{
-									int k = 0;
-									fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
-									j++;
-								}
-								txt_position -= 11;
-								if (txt_position < 0)
-								{
-									txt_position = 22;
-								}
-								
-								show_font_to_lcd(lcd->mp,0,0,bm);//************************************把画板显示到lcd屏幕上
-								destroyBitmap(bm);//***********************销毁画板**********************
-							}
-
-						}
-						
+				if (x_start - x_end < -200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//*************右滑****************
+				{
+					x_start = 0;
+					y_start = 0;
+					x_end = 0;
+					y_end = 0;
+					//创建一个画板（点阵图）
+					bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
+					int j = 0, i = txt_position;
+					for (; i < txt_position+11; i++)
+					{
+						int k = 0;
+						fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
+						j++;
 					}
+					txt_position -= 11;
+					if (txt_position < 0)
+					{
+						txt_position = 22;
+					}
+					
+					show_font_to_lcd(lcd->mp,0,0,bm);//************************************把画板显示到lcd屏幕上
+					destroyBitmap(bm);//***********************销毁画板**********************
+				}
+
+						
+	
 
 				//***********************************如果按到返回键就退出******************************
 				if (tsEvent.type == EV_KEY &&
@@ -615,9 +570,6 @@ int main(int argc, char const *argv[])
 				}
 
 			}
-			
-			//关闭字体
-			fontUnload(f);
 			
 		}
 //******************************************************小游戏************************************************************
@@ -631,14 +583,30 @@ int main(int argc, char const *argv[])
 			int game[4][4] = {0};
 			g_x = rand()%4;
 			g_y = rand()%4;
-			game[g_x][g_y] = rand();
+			if (rand()%100<66)
+			{
+				g_rand = 2;
+			}
+			g_rand = 4;
+			game[g_x][g_y] = g_rand;  //**********************在随机位置生成一个随机数***********
+
+
+			g_x = rand()%4;//****************************************
+			g_y = rand()%4;
+			if (rand()%100<66)
+			{
+				g_rand = 2;
+			}
+			g_rand = 4;
+			game[g_x][g_y] = g_rand;//*************在随机位置生成一个随机数*******************
+
 			
-			// lcd_draw_jpg(0,0,"guaguale.jpg");
-			jm_ggl_jpg("zongjiang.jpg", ggl_color_buf);
+			lcd_draw_jpg(0,0,"guaguale.jpg");              //显示刮刮乐界面
+			jm_ggl_jpg("zongjiang.jpg", ggl_color_buf);    //解码中奖图片
 			
 
-			//***********************************小游戏循环*****************************************
-			/* ************************************刮刮乐*******************************************
+			
+			//************************************刮刮乐小游戏开始*******************************************
 			while (1)
 			{
 				int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
@@ -653,6 +621,11 @@ int main(int argc, char const *argv[])
 						y_tmp = tsEvent.value *480 / 600;
 					}
 				}
+
+				x_start = 0;
+				y_start = 0;
+				x_end = 0;
+				y_end = 0;
 
 				for (int i = 0; i < 50; i++)
 				{
@@ -700,150 +673,290 @@ int main(int argc, char const *argv[])
 				}
 				
 			}	
-			*/
+			
 
 
 
-			while (1)
+			// printf("%d--%d--%d--%d\n"
+			// 		"%d--%d--%d--%d\n"
+			// 		"%d--%d--%d--%d\n",
+			// 		game[0][0], game[0][1], game[0][2], game[0][3],
+			// 		game[1][0], game[1][1], game[1][2], game[1][3],
+			// 		game[2][0], game[2][1], game[2][2], game[2][3],
+			// 		game[3][0], game[3][1], game[3][2], game[3][3]
+			// 		);
+
+			// printf("。。。。。。。。。。初始化。。。。。。。。。。。。\n");
+
+
+			/*
+			while (1)//***********************2048小游戏循环开始************************
 			{
-				int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
-				if (tsEvent.type == EV_ABS)
+				
+				xy xy_tmp = cur_xy(&tsEvent, fd_ts);
+
+
+				if (tsEvent.type == EV_KEY &&
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 1)
 				{
-					if (tsEvent.code == ABS_X)
-					{
-						x_tmp = tsEvent.value * 800 / 1024;
-					}
-					else if(tsEvent.code == ABS_Y)
-					{
-						y_tmp = tsEvent.value *480 / 600;
-					}
+					x_start = xy_tmp.x;
+					y_start = xy_tmp.y;
+					printf("x_start = %d\n",x_start);
+					printf("y_start = %d\n",y_start);
+					printf("**********************\n");
+					
 				}
-
-				srand(time(NULL));
-				
-				//初始化Lcd
-				struct LcdDevice* lcd = init_lcd("/dev/fb0");
 						
-				//打开字体	
-				font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
-				
-				//字体大小的设置
-				fontSetSize(f,80);
 
-				//创建一个画板（点阵图）
-				bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255));
+				if (tsEvent.type == EV_KEY &&
+					tsEvent.code == BTN_TOUCH && tsEvent.value == 0)
+				{
+					x_end = xy_tmp.x;
+					y_end = xy_tmp.y;
+					printf("x_end = %d\n",x_end);
+					printf("y_end = %d\n",y_end);
+					printf("**********************\n");
+					
+				}
+				if (x_start - x_end > 200 && abs(y_start - y_end) < 60)//*************左滑****************
+				printf("左滑一次。。。。。\n");
 
-				bitmap *bm01 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
-				bitmap *bm02 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
-				bitmap *bm03 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
-				bitmap *bm04 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
-				bitmap *bm05 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
-				bitmap *bm06 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
-				bitmap *bm07 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
-				bitmap *bm08 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
-				bitmap *bm09 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
-				bitmap *bm10 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
-				bitmap *bm11 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
-				bitmap *bm12 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
-				bitmap *bm13 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
-				bitmap *bm14 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
-				bitmap *bm15 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
-				bitmap *bm16 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
 
-				char *output[16] = {"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"};
-				
-				//将字体写到点阵图上
-				fontPrint(f,bm01,30,20,output[0],getColor(0,0,0,0),200);
-				fontPrint(f,bm02,30,20,output[1],getColor(0,0,0,0),200);
-				fontPrint(f,bm03,30,20,output[2],getColor(0,0,0,0),200);
-				fontPrint(f,bm04,30,20,output[3],getColor(0,0,0,0),200);
-				fontPrint(f,bm05,30,20,output[4],getColor(0,0,0,0),200);
-				fontPrint(f,bm06,30,20,output[5],getColor(0,0,0,0),200);
-				fontPrint(f,bm07,30,20,output[6],getColor(0,0,0,0),200);
-				fontPrint(f,bm08,30,20,output[7],getColor(0,0,0,0),200);
-				fontPrint(f,bm09,30,20,output[8],getColor(0,0,0,0),200);
-				fontPrint(f,bm10,30,20,output[9],getColor(0,0,0,0),200);
-				fontPrint(f,bm11,30,20,output[10],getColor(0,0,0,0),200);
-				fontPrint(f,bm12,30,20,output[11],getColor(0,0,0,0),200);
-				fontPrint(f,bm13,30,20,output[12],getColor(0,0,0,0),200);
-				fontPrint(f,bm14,30,20,output[13],getColor(0,0,0,0),200);
-				fontPrint(f,bm15,30,20,output[14],getColor(0,0,0,0),200);
-				fontPrint(f,bm16,30,20,output[15],getColor(0,0,0,0),200);
-				
-				//把字体框输出到LCD屏幕上
-				show_font_to_lcd(lcd->mp,0,0,bm01);
-				show_font_to_lcd(lcd->mp,200,0,bm02);
-				show_font_to_lcd(lcd->mp,400,0,bm03);
-				show_font_to_lcd(lcd->mp,600,0,bm04);
-				show_font_to_lcd(lcd->mp,0,120,bm05);
-				show_font_to_lcd(lcd->mp,200,120,bm06);
-				show_font_to_lcd(lcd->mp,400,120,bm07);
-				show_font_to_lcd(lcd->mp,600,120,bm08);
-				show_font_to_lcd(lcd->mp,0,240,bm09);
-				show_font_to_lcd(lcd->mp,200,240,bm10);
-				show_font_to_lcd(lcd->mp,400,240,bm11);
-				show_font_to_lcd(lcd->mp,600,240,bm12);
-				show_font_to_lcd(lcd->mp,0,360,bm13);
-				show_font_to_lcd(lcd->mp,200,360,bm14);
-				show_font_to_lcd(lcd->mp,400,360,bm15);
-				show_font_to_lcd(lcd->mp,600,360,bm16);
-				
-				//关闭字体，关闭画板
-				fontUnload(f);
-				destroyBitmap(bm);
+						/*while (1)
+						{
+							int ret_val = read(fd_ts, &tsEvent, sizeof(tsEvent));
+							if (tsEvent.type == EV_ABS)
+							{
+								if (tsEvent.code == ABS_X)
+								{
+									x_tmp = tsEvent.value * 800 / 1024;
+								}
+								else if(tsEvent.code == ABS_Y)
+								{
+									y_tmp = tsEvent.value *480 / 600;
+								}
+							}
 
-				//如果按到返回就退出小游戏循环
+							if (tsEvent.type == EV_KEY &&
+								tsEvent.code == BTN_TOUCH && tsEvent.value == 0)
+							{
+								x_end = x_tmp;
+								y_end = y_tmp;
+
+								printf("x_end = %d\n",x_end);
+								printf("y_end = %d\n",y_end);
+
+								if (x_start - x_end > 200 && abs(y_start - y_end) < 60)//*************左滑****************
+								{
+
+									printf("左移一次。。。。。\n");
+
+									int i,j,score=0,flag=-1;
+									for(i=0;i<4;i++)
+									{
+										for(j=0;j<4;j++)
+										{
+											int cell=game[i][j];//cell单词用的不太恰当，表示当前元素，你可以采用更有意义的命名
+											if(cell!=0)
+											{
+												int k=j+1;
+												while(k<4)
+												{
+													int nextcell=game[i][k];
+													if(nextcell!=0)
+													{
+														if(cell==nextcell)
+														{
+															flag=0;//相邻两个元素相同，就说明能移动，所以改变flag的值
+															game[i][j]+=game[i][k];
+															score+=game[i][j];
+															game[i][k]=0;
+														}
+														k=4;
+														break;
+													}
+													k++;
+												}
+											}
+										}
+									}
+
+									for(i=0;i<4;i++)
+									{
+										for(j=0;j<4-1;j++)
+										{
+											int cell=game[i][j];
+											if(cell==0)
+											{
+												int k=j+1;
+												while(k<4)
+												{
+													int nextcell=game[i][k];
+													if(nextcell!=0)
+													{
+														flag=0;//
+														game[i][j]=nextcell;
+														game[i][k]=0;
+														k=4;
+													}
+													k++;
+												}
+
+											}
+										}
+									}
+						
+									printf("%d--%d--%d--%d\n"
+										"%d--%d--%d--%d\n"
+										"%d--%d--%d--%d\n",
+											game[0][0], game[0][1], game[0][2], game[0][3],
+											game[1][0], game[1][1], game[1][2], game[1][3],
+											game[2][0], game[2][1], game[2][2], game[2][3],
+											game[3][0], game[3][1], game[3][2], game[3][3]
+											);
+
+									g_x = rand()%4;//****************************************
+									g_y = rand()%4;
+									if (rand()%100<66)
+									{
+										g_rand = 2;
+									}
+									g_rand = 4;
+									game[g_x][g_y] = g_rand;//*************在随机位置生成一个随机数*******************
+
+
+									printf("%d--%d--%d--%d\n"
+											"%d--%d--%d--%d\n"
+											"%d--%d--%d--%d\n",
+												game[0][0], game[0][1], game[0][2], game[0][3],
+												game[1][0], game[1][1], game[1][2], game[1][3],
+												game[2][0], game[2][1], game[2][2], game[2][3],
+												game[3][0], game[3][1], game[3][2], game[3][3]
+												);
+								}
+							}
+							break;
+
+						}
+						
+	
+					
 				if (tsEvent.type == EV_KEY &&
 					tsEvent.code == BTN_TOUCH &&
-					tsEvent.value == 1 && x_tmp >750 && y_tmp < 50)
+					tsEvent.value == xy_tmp.x > 750 && xy_tmp.y < 50)
 				{
 					break;
 				}
+					
+			}*/
+			//*********************************2048小游戏循环结束************************************
+					
 
-
-
-
-			}
 				
 				
+
+			
+				// //初始化Lcd
+				// struct LcdDevice* lcd = init_lcd("/dev/fb0");
+						
+				// //打开字体	
+				// font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
 				
+				// //字体大小的设置
+				// fontSetSize(f,80);
+
+				// //创建一个画板（点阵图）
+				// bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255));
+
+				// bitmap *bm01 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
+				// bitmap *bm02 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
+				// bitmap *bm03 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
+				// bitmap *bm04 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
+				// bitmap *bm05 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
+				// bitmap *bm06 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
+				// bitmap *bm07 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
+				// bitmap *bm08 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
+				// bitmap *bm09 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
+				// bitmap *bm10 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
+				// bitmap *bm11 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
+				// bitmap *bm12 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
+				// bitmap *bm13 = createBitmapWithInit(200,120,4,getColor(0,255,246,143));
+				// bitmap *bm14 = createBitmapWithInit(200,120,4,getColor(0,255,255,255));
+				// bitmap *bm15 = createBitmapWithInit(200,120,4,getColor(0,0,191,255));
+				// bitmap *bm16 = createBitmapWithInit(200,120,4,getColor(0,0,255,127));
+
+				// char *output[16] = {"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"};
+				
+				// //将字体写到点阵图上
+				// fontPrint(f,bm01,30,20,output[0],getColor(0,0,0,0),200);
+				// fontPrint(f,bm02,30,20,output[1],getColor(0,0,0,0),200);
+				// fontPrint(f,bm03,30,20,output[2],getColor(0,0,0,0),200);
+				// fontPrint(f,bm04,30,20,output[3],getColor(0,0,0,0),200);
+				// fontPrint(f,bm05,30,20,output[4],getColor(0,0,0,0),200);
+				// fontPrint(f,bm06,30,20,output[5],getColor(0,0,0,0),200);
+				// fontPrint(f,bm07,30,20,output[6],getColor(0,0,0,0),200);
+				// fontPrint(f,bm08,30,20,output[7],getColor(0,0,0,0),200);
+				// fontPrint(f,bm09,30,20,output[8],getColor(0,0,0,0),200);
+				// fontPrint(f,bm10,30,20,output[9],getColor(0,0,0,0),200);
+				// fontPrint(f,bm11,30,20,output[10],getColor(0,0,0,0),200);
+				// fontPrint(f,bm12,30,20,output[11],getColor(0,0,0,0),200);
+				// fontPrint(f,bm13,30,20,output[12],getColor(0,0,0,0),200);
+				// fontPrint(f,bm14,30,20,output[13],getColor(0,0,0,0),200);
+				// fontPrint(f,bm15,30,20,output[14],getColor(0,0,0,0),200);
+				// fontPrint(f,bm16,30,20,output[15],getColor(0,0,0,0),200);
+				
+				// //把字体框输出到LCD屏幕上
+				// show_font_to_lcd(lcd->mp,0,0,bm01);
+				// show_font_to_lcd(lcd->mp,200,0,bm02);
+				// show_font_to_lcd(lcd->mp,400,0,bm03);
+				// show_font_to_lcd(lcd->mp,600,0,bm04);
+				// show_font_to_lcd(lcd->mp,0,120,bm05);
+				// show_font_to_lcd(lcd->mp,200,120,bm06);
+				// show_font_to_lcd(lcd->mp,400,120,bm07);
+				// show_font_to_lcd(lcd->mp,600,120,bm08);
+				// show_font_to_lcd(lcd->mp,0,240,bm09);
+				// show_font_to_lcd(lcd->mp,200,240,bm10);
+				// show_font_to_lcd(lcd->mp,400,240,bm11);
+				// show_font_to_lcd(lcd->mp,600,240,bm12);
+				// show_font_to_lcd(lcd->mp,0,360,bm13);
+				// show_font_to_lcd(lcd->mp,200,360,bm14);
+				// show_font_to_lcd(lcd->mp,400,360,bm15);
+				// show_font_to_lcd(lcd->mp,600,360,bm16);
+				
+				// //关闭字体，关闭画板
+				// fontUnload(f);
+				// destroyBitmap(bm);
+				// destroyBitmap(bm01);
+				// destroyBitmap(bm02);
+				// destroyBitmap(bm03);
+				// destroyBitmap(bm04);
+				// destroyBitmap(bm05);
+				// destroyBitmap(bm06);
+				// destroyBitmap(bm07);
+				// destroyBitmap(bm08);
+				// destroyBitmap(bm09);
+				// destroyBitmap(bm10);
+				// destroyBitmap(bm11);
+				// destroyBitmap(bm12);
+				// destroyBitmap(bm13);
+				// destroyBitmap(bm14);
+				// destroyBitmap(bm15);         
+		
 			
 			
-		}
+		}//**************************小游戏结束**************************
 
 
 
+	}//***********************主循环结束******************************************************
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	}
-//***********************主循环结束******************************************************
 	
-
+	fontUnload(f);//关闭字体
 	lcd_close();//**********jpg****关闭lcd屏幕***************
 	close(fd_ts);//**********关闭触摸屏*****************
     fclose(gd_count);//**************关闭功德计数文件*********************
     return 0;
-}
+}//*****************************main函数结束*****************************************
+
 
 

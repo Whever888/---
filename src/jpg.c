@@ -15,8 +15,9 @@ static unsigned char g_color_buf[FB_SIZE]={0};
 int  lcd_fd;
 int *mmap_fd;
 
-
-//初始化LCD
+/// @brief      (jpg)打开并映射lcd文件
+/// @param    	参数为空
+/// @return    返回lcd文件描述符
 int lcd_open(void)
 {
 	lcd_fd = open("/dev/fb0", O_RDWR);
@@ -173,7 +174,8 @@ int lcd_draw_jpg(unsigned int x,unsigned int y,const char *pjpg_path)
 }
 
 
-//LCD关闭
+/// @brief (jpg)取消lcd映射并关闭文件
+/// @param  无
 void lcd_close(void)
 {
 	
