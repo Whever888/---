@@ -171,9 +171,9 @@ int main(int argc, char const *argv[])
 	"拉出来。”年纪最小的那少年不服气了：“我不依，你们",
 	"偏心，我告诉我娘去！”老烟头大笑：“你看你看，三伢"
 	};
+	
 	int  gd_tmp = 0;//功德计数
 	int ggl_color_buf[800*480];//图片刮刮乐解码后的像素信息
-	int txt_position = 0;//小说位置
 	char gd_buf[20] = {0};//功德转换字符数组
 	FILE *gd_count = fopen("gd_count.txt", "r+");//功德文件
 	if (gd_count == NULL)
@@ -219,7 +219,7 @@ int main(int argc, char const *argv[])
 //****************************************************菜单********************************************************
 
 		manu();//显示菜单
-		fscanf(gd_count, "%s", &gd_buf);
+		fscanf(gd_count, "%s", gd_buf);
 
 		//初始化Lcd
 		struct LcdDevice* lcd = init_lcd("/dev/fb0");
@@ -264,7 +264,10 @@ int main(int argc, char const *argv[])
 			tsEvent.code == BTN_TOUCH &&
 			tsEvent.value == 1 && x_tmp >750 && y_tmp < 50)
 		{
+			
 			manu();
+			fseek(gd_count, 0, SEEK_SET);
+			fscanf(gd_count, "%s", gd_buf);
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
 							
@@ -290,14 +293,14 @@ int main(int argc, char const *argv[])
 			lcd_draw_jpg(0,0,"gd2.jpg");
 
 			fseek(gd_count, 0, SEEK_SET);
-			fscanf(gd_count, "%s", &gd_buf);
+			fscanf(gd_count, "%s", gd_buf);
 			gd_tmp = atoi(gd_buf);
 			gd_tmp++;
 
 			fseek(gd_count, 0, SEEK_SET);
 			fprintf(gd_count, "%d", gd_tmp);
 			fseek(gd_count, 0, SEEK_SET);
-			fscanf(gd_count, "%s", &gd_buf);
+			fscanf(gd_count, "%s", gd_buf);
 
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
@@ -323,7 +326,7 @@ int main(int argc, char const *argv[])
 			lcd_draw_jpg(0,0,"gd1.jpg");
 
 			fseek(gd_count, 0, SEEK_SET);
-			fscanf(gd_count, "%s", &gd_buf);
+			fscanf(gd_count, "%s", gd_buf);
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
 								
@@ -442,12 +445,19 @@ int main(int argc, char const *argv[])
 			tsEvent.code == BTN_TOUCH &&
 			tsEvent.value == 1 && x_tmp >400 && y_tmp >240)
 		{
-			FILE *txt = fopen("xiaosuo.txt", "r");
+			FILE *txt = fopen("xiaosuo.txt", "r");//打开小说文件
 			if (txt == NULL)
 			{
 				printf("打开“txt”失败\n");
 			}
 
+			FILE *novel_position = fopen("novel_position.txt", "a+");//打开小说位置信息文件
+			if (novel_position == NULL)
+			{
+				printf("打开“novel_position.txt”失败\n");
+			}
+
+			int txt_position = 0;//小说当前位置
 
 			//初始化Lcd
 			struct LcdDevice* lcd = init_lcd("/dev/fb0");
@@ -458,22 +468,107 @@ int main(int argc, char const *argv[])
 			//字体大小的设置
 			fontSetSize(f,44);
 
-			int j = 0,i = txt_position;
-			for (; i < txt_position+11; i++)
+			fseek(novel_position, 0, SEEK_SET);
+			fscanf(novel_position, "%d", &txt_position);//读取小说当前位置信息
+
+			fseek(txt, txt_position, SEEK_SET);
+			char novel_buf[80] = {0};//小说内容缓冲数组
+			for (int i = 0; i < 11; i++)
 			{
 				int k = 0;
-				fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
-				j++;
+				// fscanf(txt,  "%[^\n]\n", novel_buf);
+				fgets(novel_buf, sizeof(novel_buf), txt);
+				fontPrint(f,bm,0,k+=i*44,novel_buf,getColor(0,0,0,0),800);//*********把字写到画布上
 			}
-			txt_position += 11;
+			txt_position = ftell(txt);
 
-			if (txt_position > 23)
+			if(feof(txt))
 			{
-				txt_position = 0;
+				printf("文件内容已读完.\n");
+				// txt_position = 0;
 			}
+//------↓--------↓---------------↓---以下区域配置小说位置偏移量文件---↓----------↓-----------↓------↓-------------
+			int page_in_total = 0;//总页数(包括上一次的偏移量记录)
+			// txt_position = 0;//小说当前位置
+			char novel_position_buf[10] = {0}; //用于计算页数的缓冲区
+
+			fseek(novel_position, 0, SEEK_SET);//偏移到文件开头
+			while (1)//遍历位置信息文件计算总页数（如果第一次打开此文件则为0，否则为非0）
+			{
+				if (fgets(novel_position_buf, 10, novel_position) != NULL)
+				{
+					page_in_total++;
+				}
+				else
+				{
+					break;
+				}
+			}
+			// page_in_total = page_in_total - 1;
+			int page_index[page_in_total];//小说位置偏移量数组
+		
+			bzero(page_index, page_in_total);//清空小说位置偏移量数组  
+			printf("total[%d]\n", page_in_total);
+
+			fseek(novel_position, 0, SEEK_SET);//偏移到文件开头
+			fscanf(novel_position, "%d", &txt_position);//读取第一行小说当前位置信息
+
+			if (txt_position == 0 && page_in_total == 0)//小说当前位置为0且位置信息文件总页数为0表示第一次打开这本小说
+			{
+				fprintf(novel_position, "%d\n", txt_position);//把小说当前位置信息写在位置文件第一行
+
+				while (1)
+				{
+					fprintf(novel_position, "%d\n", txt_position);//把小说第一页位置信息写在位置文件第二行，并把后续偏移量继续写入位置文件
+					char novel_buf[80] = {0};//小说内容缓冲数组
+					for (int i = 0; i < 11; i++)//***********************************以下是打印区
+					{
+						int k = 0;
+						fscanf(txt,  "%[^\n]\n", novel_buf);                 
+						printf("[%s]\n", novel_buf);
+					}//********************************************以上是打印区
+
+					txt_position = ftell(txt);//下一页的起始位置
+
+					if(feof(txt))
+					{
+						printf("文件内容已读完.\n");
+						txt_position = 0;
+						break;
+					}
+					
+				}
+			}
+
+			fseek(novel_position, 0, SEEK_SET);//偏移到文件开头
+			for (int i = 0; i < page_in_total; i++)//把位置信息文件偏移量加入数组
+			{
+				fscanf(novel_position, "%d", &page_index[i]);
+				printf("page_index[%d]=[%d]\n", i, page_index[i]);
+			}
+
+
+
+//-------↑--------↑---------------↑---以上区域配置小说位置偏移量文件---↑----------↑-----------↑------↑-------
+
+
 			show_font_to_lcd(lcd->mp,0,0,bm);//************************************把画板显示到lcd屏幕上
 
 			destroyBitmap(bm);//********************关闭画板****************************
+
+			// printf("*******************************************************\n");
+			// bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255));
+			// fseek(txt, page_index[2], SEEK_SET);
+			// for (int i = 0; i < 11; i++)//***********************************以下是打印区
+			// {
+			// 	int k = 0;
+			// 	fscanf(txt,  "%[^\n]\n", novel_buf);      
+			// 	fontPrint(f,bm,0,k+=i*44,novel_buf,getColor(0,0,0,0),800);//*********把字写到画布上           
+			// 	printf("[%s]\n", novel_buf);
+			// }//********************************************以上是打印区
+			// show_font_to_lcd(lcd->mp,0,0,bm);//**************把画板显示到lcd屏幕上
+			// destroyBitmap(bm);//***********************销毁画板**********************
+			// printf("*******************************************************\n");
 
 
 			while (1)
@@ -507,7 +602,7 @@ int main(int argc, char const *argv[])
 					y_end = y_tmp;
 				}
 
-				if (x_start - x_end > 200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//*************左滑****************
+				if (x_start - x_end > 200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//***左滑*****
 				{
 					x_start = 0;
 					y_start = 0;
@@ -515,25 +610,26 @@ int main(int argc, char const *argv[])
 					y_end = 0;
 					//创建一个画板（点阵图）
 					bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
-					int j = 0, i = txt_position;
-					for (; i < txt_position+11; i++)
+					fseek(txt, txt_position, SEEK_SET);
+					for (int i = 0; i < 11; i++)
 					{
 						int k = 0;
-						fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
-						j++;
+						fscanf(txt,  "%[^\n]\n", novel_buf);
+						fontPrint(f,bm,0,k+=i*44,novel_buf,getColor(0,0,0,0),800);//*********把字写到画布上
 					}
-					txt_position += 11;
-					if (txt_position > 23)
+					txt_position = ftell(txt);
+
+					if(feof(txt))
 					{
+						printf("文件内容已读完.\n");
 						txt_position = 0;
 					}
-					
+
 					show_font_to_lcd(lcd->mp,0,0,bm);//**************把画板显示到lcd屏幕上
 					destroyBitmap(bm);//***********************销毁画板**********************
 				}
-							
 
-				if (x_start - x_end < -200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//*************右滑****************
+				if (x_start - x_end < -200 && abs(y_start - y_end) < 60 && x_end*y_end*x_start*y_start != 0)//***右滑*****
 				{
 					x_start = 0;
 					y_start = 0;
@@ -541,25 +637,64 @@ int main(int argc, char const *argv[])
 					y_end = 0;
 					//创建一个画板（点阵图）
 					bitmap *bm = createBitmapWithInit(800,480,4,getColor(0,255,255,255)); //也可使用createBitmapWithInit函数，改变画板颜色
-					int j = 0, i = txt_position;
-					for (; i < txt_position+11; i++)
+					int buf[13] = {0,
+									1470,
+									2246,
+									3028,
+									3847,
+									4655,
+									5394,
+									6161,
+									6923,
+									7682,
+									8450,
+									9229,
+									9992};
+					for (int k = 0; k < 13; k++)//*******************实验***************************     
+					{
+						txt_position = buf[k];																printf("__%d__\n",__LINE__);
+					
+					
+						for (int i = 1; i < page_in_total; i++)//查找当前位置在偏移量数组中的位置，偏移到上一页
+						{
+							if (page_index[i] == txt_position && i > 2 ) 									
+							{	
+								fseek(txt, page_index[i-2], SEEK_SET);										printf("__%d__\n",__LINE__);
+								printf("end1[%d]-[%d]\n", i, ftell(txt));									printf("__%d__\n",__LINE__);
+							}
+							else if (page_index[i] == txt_position && i == 1 )								
+							{	
+								fseek(txt, page_index[13], SEEK_SET);										printf("__%d__\n",__LINE__);
+								printf("end2[%d]-[%d]\n", i, ftell(txt));									printf("__%d__\n",__LINE__);
+							}
+							else if (page_index[i] == txt_position && i == 2)
+							{	
+								fseek(txt, page_index[13], SEEK_SET);										printf("__%d__\n",__LINE__);
+								printf("end3[%d]-[%d]\n", i, ftell(txt));									printf("__%d__\n",__LINE__);
+							}
+							
+						}
+					//*************************************************
+
+					for (int i = 0; i < 11; i++)
 					{
 						int k = 0;
-						fontPrint(f,bm,0,k+=j*44,xiaosuo[i],getColor(0,0,0,0),800);//*********把字写到画布上
-						j++;
+						// fscanf(txt,  "%[^\n]\n", novel_buf);
+						fgets(novel_buf, sizeof(novel_buf), txt);
+						fontPrint(f,bm,0,k+=i*44,novel_buf,getColor(0,0,0,0),800);//*********把字写到画布上
 					}
-					txt_position -= 11;
-					if (txt_position < 0)
+
+					txt_position = ftell(txt);
+					// sleep(1);
+					if(feof(txt))
 					{
-						txt_position = 22;
+						printf("文件内容已读完.\n");
 					}
 					
-					show_font_to_lcd(lcd->mp,0,0,bm);//************************************把画板显示到lcd屏幕上
+					show_font_to_lcd(lcd->mp,0,0,bm);printf("__%d__\n",__LINE__);//************************************把画板显示到lcd屏幕上
 					destroyBitmap(bm);//***********************销毁画板**********************
+					}//*********************************实验***********************************
 				}
-
-						
-	
 
 				//***********************************如果按到返回键就退出******************************
 				if (tsEvent.type == EV_KEY &&
@@ -570,7 +705,9 @@ int main(int argc, char const *argv[])
 				}
 
 			}
-			
+
+		fclose(txt);
+		fclose(novel_position);	
 		}
 //******************************************************小游戏************************************************************
 		if (tsEvent.type == EV_KEY &&
