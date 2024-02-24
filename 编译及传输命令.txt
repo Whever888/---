@@ -1,3 +1,6 @@
 arm-linux-gcc ./src/*.c -I./inc/ -L./lib -lfont -lm -ljpeg -o./bin/moyu.out
 scp ./bin/moyu.out root@192.168.11.182:/jinx/
 ssh root@192.168.11.182
+
+arm-linux-gcc 1_test_main.c ts.c -o test_main.out
+scp ./test_main.out root@192.168.11.182:/jinx/
