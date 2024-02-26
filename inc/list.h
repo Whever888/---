@@ -21,7 +21,6 @@ typedef struct Node
 
 P_Node NodeInit(P_DataType new);
 
-
 DataType GetNewData();
 
 void Add2List(P_Node Head, P_Node NewNode);

@@ -199,14 +199,14 @@ int main(int argc, char const *argv[])
 	int direction = 0;
 
 	//********************显示屏初始化**************************
-	lcd_open();
+	lcd_open();//(jpg的lcd初始化)
 	//****************************************************菜单********************************************************
 
 	manu(); // 显示菜单
 	fscanf(gd_count, "%s", gd_buf);
 
 	// 初始化Lcd
-	struct LcdDevice *lcd = init_lcd("/dev/fb0");
+	struct LcdDevice *lcd = init_lcd("/dev/fb0");//(font的lcd初始化)
 
 	// 打开字体
 	font *f = fontLoad("/usr/share/fonts/DroidSansFallback.ttf");
